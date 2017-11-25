@@ -1,0 +1,43 @@
+{
+  "name": "workoutapp",
+  "version": "1.0.0",
+  "description": "Building a workout app that:\r Allows you to log workouts\r Snag other people's workouts\r Create Exercises, Workouts, Programs, Request to add new Movements",
+  "main": "dist/server",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm run build && npm run watch",
+    "build": "npm run build-ts && npm run tslint",
+    "serve": "nodemon ./dist/server.js",
+    "watch": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Node\" -c \"cyan.bold,green.bold\" \"npm run watch-ts\" \"npm run serve\"",
+    "build-ts": "tsc",
+    "watch-ts": "tsc -w",
+    "tslint": "tslint -c tslint.json -p tsconfig.json",
+    "serve-debug": "nodemon --inspect dist/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blake-boswell/Workout-App.git"
+  },
+  "author": "Blake Boswell",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/blake-boswell/Workout-App/issues"
+  },
+  "homepage": "https://github.com/blake-boswell/Workout-App#readme",
+  "devDependencies": {
+    "@types/express": "^4.0.39",
+    "@types/mongodb": "^2.2.16",
+    "@types/mongoose": "^4.7.28",
+    "@types/node": "^8.0.53",
+    "concurrently": "^3.5.1",
+    "eslint": "^4.11.0",
+    "eslint-config-google": "^0.9.1",
+    "ts-node": "^3.3.0",
+    "tslint": "^5.8.0",
+    "typescript": "^2.6.1"
+  },
+  "dependencies": {
+    "express": "^4.16.2",
+    "mongoose": "^4.13.5"
+  }
+}
