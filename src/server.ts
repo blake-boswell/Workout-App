@@ -3,11 +3,12 @@ import * as mongoose from "mongoose";
 import * as bodyParser from "body-parser";
 
 import * as UserController from "./controllers/UserController";
+import config from "./config/db.config";
 
 const app = express();
 
 // connect to mongo
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workoutApp", {
+mongoose.connect(process.env.MONGODB_URI || config.url, {
     useMongoClient: true
 });
 

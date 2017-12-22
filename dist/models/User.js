@@ -16,6 +16,13 @@ var userSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    admin: {
+        type: Boolean,
+        default: false
+    },
+    accessToken: {
+        type: String
+    },
     info: {
         height: String,
         weight: String,

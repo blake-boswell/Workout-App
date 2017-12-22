@@ -4,9 +4,10 @@ var express = require("express");
 var mongoose = require("mongoose");
 var bodyParser = require("body-parser");
 var UserController = require("./controllers/UserController");
+var db_config_1 = require("./config/db.config");
 var app = express();
 // connect to mongo
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workoutApp", {
+mongoose.connect(process.env.MONGODB_URI || db_config_1.default.url, {
     useMongoClient: true
 });
 mongoose.connection.on("error", function () {
