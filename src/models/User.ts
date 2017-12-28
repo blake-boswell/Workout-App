@@ -1,4 +1,21 @@
 import * as mongoose from "mongoose";
+import * as bcrypt from "bcrypt";
+import * as jwt from "jsonwebtoken";
+import config from "../config/db.config";
+
+export interface IUser extends mongoose.Document {
+    userName: string;
+    password: string;
+    email: string;
+    admin: boolean;
+    accessToken?: string;
+    isDeleted: boolean;
+    createdAt: Date;
+
+    createUser: (newUser: IUser, callback: any) => void;
+    comparePassword: (candidatePassword: string, callback: any) => void;
+  }
+export type UserType = IUser & mongoose.Document;
 
 const userSchema = new mongoose.Schema({
     userName: {
@@ -78,6 +95,29 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-const User = mongoose.model("User", userSchema);
+userSchema.statics.createUser = function(newUser: UserType, callback: any) {
+    bcrypt.genSalt(10, function(err, salt) {
+        if(err) {
+            console.error("Failed generating salt.");
+            throw err;
+        }
+        bcrypt.hash(newUser.password, salt, function(err, hash) {
+            if(err) {
+                console.error("Could not hash password");
+            } else {
+                newUser.password = hash;
+                newUser.save(callback);
+            }
+        });
+    });
+};
 
+userSchema.methods.comparePassword = function(candidatePassword: String, callback: (err: any, isMatch: boolean) => {}) {
+    // compare pw to DB pw
+    bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
+        callback(err, isMatch);
+    });
+};
+
+const User = mongoose.model<UserType>("User", userSchema);
 export default User;

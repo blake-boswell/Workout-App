@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var mongoose = require("mongoose");
+var bcrypt = require("bcrypt");
 var userSchema = new mongoose.Schema({
     userName: {
         type: String,
@@ -78,5 +79,28 @@ var userSchema = new mongoose.Schema({
         default: Date.now
     }
 });
+userSchema.statics.createUser = function (newUser, callback) {
+    bcrypt.genSalt(10, function (err, salt) {
+        if (err) {
+            console.error("Failed generating salt.");
+            throw err;
+        }
+        bcrypt.hash(newUser.password, salt, function (err, hash) {
+            if (err) {
+                console.error("Could not hash password");
+            }
+            else {
+                newUser.password = hash;
+                newUser.save(callback);
+            }
+        });
+    });
+};
+userSchema.methods.comparePassword = function (candidatePassword, callback) {
+    // compare pw to DB pw
+    bcrypt.compare(candidatePassword, this.password, function (err, isMatch) {
+        callback(err, isMatch);
+    });
+};
 var User = mongoose.model("User", userSchema);
 exports.default = User;

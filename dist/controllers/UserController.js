@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var User_1 = require("../models/User");
-var bcrypt = require("bcrypt");
 var jwt = require("jsonwebtoken");
 var db_config_1 = require("../config/db.config");
 /**
@@ -34,32 +33,22 @@ exports.postSignup = function (req, res, next) {
             }
             // email && username are unique
             // hash pw with bcrypt
-            bcrypt.genSalt(10, function (err, salt) {
+            var newUser = new User_1.default({
+                userName: req.body.userName,
+                password: req.body.password,
+                email: req.body.email
+            });
+            User_1.default.schema.statics.createUser(newUser, function (err, user) {
                 if (err) {
-                    console.error("Failed generating salt.");
-                    return res.status(500).json({ message: "Failed generating salt." });
+                    console.error("Failed creating user");
+                    throw err;
                 }
-                bcrypt.hash(req.body.password, salt, function (err, hash) {
-                    if (err) {
-                        console.error("Could not hash password");
-                        return res.status(500).json({ message: "Could not hash password" });
-                    }
-                    var newUser = new User_1.default({
-                        userName: req.body.userName,
-                        password: hash,
-                        email: req.body.email
-                    });
-                    newUser.save(function (err) {
-                        if (err) {
-                            console.error("Failed saving user to DB");
-                            return res.status(500).json({ message: "Failed saving user to DB" });
-                        }
-                    }).then(function () {
-                        // log user in and send them to the home page
-                        // res.redirect("../login");
-                        res.status(200).json({ message: "Success! Welcome " + newUser });
-                    });
-                });
+                else {
+                    console.log(user);
+                    // log user in and send them to the home page
+                    // res.redirect("../login");
+                    res.status(200).json({ message: "Success! Welcome " + newUser });
+                }
             });
         });
     });
@@ -77,12 +66,12 @@ exports.postLogin = function (req, res, next) {
         }
         if (user) {
             // compare pw to DB pw
-            bcrypt.compare(req.body.password, user.password, function (err, response) {
+            user.comparePassword(req.body.password, function (err, isMatch) {
                 if (err) {
                     console.error("Failed comparing PWs");
                     return res.status(500).json({ message: "Failed comparing PWs" });
                 }
-                if (response) {
+                if (isMatch) {
                     // Success! Log user in & give them a web token
                     // The payload contains all the data we want to be able to access locally that shouldn't change
                     var payload = {
@@ -117,6 +106,7 @@ exports.postLogin = function (req, res, next) {
                     });
                 }
                 else {
+                    // Not a match
                     return res.status(500).json({ message: "Authentication failed! Incorrect password" });
                 }
             });
