@@ -1,4 +1,3 @@
-"use strict";
 // import * as jwt from "jsonwebtoken";
 // class TokenGenerator {
 //     secretOrPublicKey: any;

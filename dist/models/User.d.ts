@@ -1,7 +1,7 @@
 /// <reference types="mongoose" />
 import * as mongoose from "mongoose";
 export interface IUser extends mongoose.Document {
-    userName: string;
+    username: string;
     password: string;
     email: string;
     admin: boolean;

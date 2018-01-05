@@ -1,8 +1,8 @@
-import User from "../models/User";
+import User, { UserType } from "../models/User";
 import { Request, Response, NextFunction } from "express";
+import * as passport from "passport";
 import * as bcrypt from "bcrypt";
 import * as jwt from "jsonwebtoken";
-import config from "../config/db.config";
 
 /**
  * POST /signup
@@ -22,7 +22,7 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
             return res.status(409).json({message: "Email is already in use"});
         }
         // make sure username isn't already in use
-        User.findOne({userName: req.body.userName}, function(err: any, user: any) {
+        User.findOne({username: req.body.username}, function(err: any, user: any) {
             if(err) {
                 console.error("Failed finding user in DB");
                 return res.status(500).json({message: "Failed finding user in DB"});
@@ -36,7 +36,7 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
             // email && username are unique
             // hash pw with bcrypt
             const newUser = new User({
-                userName: req.body.userName,
+                username: req.body.username,
                 password: req.body.password,
                 email: req.body.email
             });
@@ -46,7 +46,7 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
                     throw err;
                 } else {
                     console.log(user);
-                    // log user in and send them to the home page
+                    // TODO: log user in and send them to the home page
                     // res.redirect("../login");
                     res.status(200).json({message: "Success! Welcome " + newUser});
                 }
@@ -60,59 +60,53 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
  * Login action
  */
 export let postLogin = function(req: Request, res: Response, next: NextFunction) {
-    // is information correct
-    User.findOne({userName: req.body.userName}, function(err, user) {
+
+    passport.authenticate("local", function(err: Error, user: UserType, info: any) {
+        // user and err are retrieved through the done callback from the LocalStrategy in /config/passport file
+        if(info != undefined) {
+            console.log("[Local Authenticate]You got some info: ");
+            console.log(info);
+        }
         if(err) {
-            console.error("Failed finding user in DB");
-            return res.status(500).json({message: "Failed finding user in DB"});
+            return next(err);
         }
-        if(user) {
-            // compare pw to DB pw
-            user.comparePassword(req.body.password, function(err: any, isMatch: boolean) {
+        if(!user) {
+            // TODO: Flash user error message
+            res.status(401).redirect("/login");
+        }
+        // establish a session
+        req.login(user, function(err) {
+            if(err) {
+                return next(err);
+            }
+            // Success! Redirect user & give them a web token
+            // The payload contains all the data we want to be able to access locally that shouldn't change
+            const payload = {
+                "userID": user._id,
+                "admin": user.admin
+            };
+            jwt.sign(payload, <string>process.env.TOKEN_SECRET, {expiresIn: 60*15, issuer: "Boz", subject: "AuthenticationToken"}, function(err, token) {
                 if(err) {
-                    console.error("Failed comparing PWs");
-                    return res.status(500).json({message: "Failed comparing PWs"});
+                    return next(err);
                 }
-                if(isMatch) {
-                    // Success! Log user in & give them a web token
-                    // The payload contains all the data we want to be able to access locally that shouldn't change
-
-                    const payload = {
-                        "userName": user.userName,
-                        "admin": user.admin
-                    };
-                    jwt.sign(payload, config.secret, {expiresIn: 60*15, issuer: "Boz", subject: "AuthenticationToken"}, function(err, token) {
-                        if(err) {
-                            console.error("Failed signing token");
-                            return res.status(500).json({message: "Failed signing token"});
-                        } else {
-                            // Persist token (store to localStorage and/or cookie on the front end)
-                            // All new requests should verify the web token
-                            // When token is valid, respond, otherwise send an error
-                            console.log("Token created!");
-                            User.findOne(user, function(err, doc) {
-                                if(err) {
-                                    console.error("Failed finding user in DB");
-                                    return res.status(500).json({message: "Failed finding user in DB"});
-                                } else if(doc) {
-                                    doc.accessToken = token;
-                                    doc.save();
-                                } else {
-                                    return res.status(500).json({message: "The user was not found. Couldn't provide the intended user with a token"});
-                                }
-                            });
-                            return res.status(200).json({"token": token, message: "Success! Welcome " + user.userName});
-                        }
-                     });
-
-
-                } else {
-                    // Not a match
-                    return res.status(500).json({message: "Authentication failed! Incorrect password"});
-                }
+                // Persist token (store to localStorage and/or cookie on the front end)
+                // All new requests should verify the web token
+                // When token is valid, respond, otherwise send an error
+                console.log("Token created!");
+                User.findOne(user, function(err, doc) {
+                    if(err) {
+                        return next(err);
+                    } else if(doc) {
+                        doc.accessToken = "Bearer " + token;
+                        doc.save();
+                    } else {
+                        return res.status(500).json({message: "The user was not found. Couldn't provide the intended user with a token"});
+                    }
+                });
+                // TODO: redirect to user homepage
+                req.flash("AuthSuccess", "Successfully logged in!");
+                return res.status(200).redirect("/");
             });
-        } else {
-            return res.status(500).json({message: "Authentication failed! User not found"});
-        }
-    });
+        });
+    })(req, res, next);
 };

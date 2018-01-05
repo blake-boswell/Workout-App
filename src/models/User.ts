@@ -1,10 +1,8 @@
 import * as mongoose from "mongoose";
 import * as bcrypt from "bcrypt";
-import * as jwt from "jsonwebtoken";
-import config from "../config/db.config";
 
 export interface IUser extends mongoose.Document {
-    userName: string;
+    username: string;
     password: string;
     email: string;
     admin: boolean;
@@ -18,7 +16,7 @@ export interface IUser extends mongoose.Document {
 export type UserType = IUser & mongoose.Document;
 
 const userSchema = new mongoose.Schema({
-    userName: {
+    username: {
         type: String,
         required: true,
         unique: true
