@@ -11,7 +11,7 @@ exports.postSignup = function (req, res, next) {
     // make sure the email isn't already in use
     User_1.default.findOne({ email: req.body.email }, function (err, user) {
         if (err) {
-            return res.status(500).json({ message: "Failed finding user in DB" });
+            return res.status(500).json({ message: "Failed finding user in DB", error: err });
         }
         if (user) {
             // email is already in use
@@ -19,11 +19,12 @@ exports.postSignup = function (req, res, next) {
             // return res.redirect("/signup");
             return res.status(409).json({ message: "Email is already in use" });
         }
+        console.log("It keeps going....");
         // make sure username isn't already in use
         User_1.default.findOne({ username: req.body.username }, function (err, user) {
             if (err) {
                 console.error("Failed finding user in DB");
-                return res.status(500).json({ message: "Failed finding user in DB" });
+                return res.status(500).json({ message: "Failed finding user in DB", error: err });
             }
             if (user) {
                 // username is already in use
@@ -35,13 +36,15 @@ exports.postSignup = function (req, res, next) {
             // hash pw with bcrypt
             var newUser = new User_1.default({
                 username: req.body.username,
+                displayName: req.body.displayName,
                 password: req.body.password,
                 email: req.body.email
             });
+            // console.log(newUser);
             User_1.default.schema.statics.createUser(newUser, function (err, user) {
                 if (err) {
                     console.error("Failed creating user");
-                    throw err;
+                    return res.status(500).json({ message: "Failed creating user", error: err });
                 }
                 else {
                     console.log(user);

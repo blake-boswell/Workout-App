@@ -22,13 +22,13 @@ passport.deserializeUser(function (id, done) {
 });
 // // Local Strategy configuration
 // // Sends an error (undefined if there is none), a user (false if there is none) through the done callback
-passport.use(new LocalStrategy(function (username, password, done) {
-    User_1.default.findOne({ username: username }, function (err, user) {
+passport.use(new LocalStrategy({ usernameField: "email" }, function (email, password, done) {
+    User_1.default.findOne({ email: email }, function (err, user) {
         if (err) {
             return done(err);
         }
         if (!user) {
-            return done(undefined, false, { message: "Incorrect username." });
+            return done(undefined, false, { message: "Incorrect email." });
         }
         user.comparePassword(password, function (err, isMatch) {
             if (err) {

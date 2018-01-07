@@ -13,7 +13,7 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
     // make sure the email isn't already in use
     User.findOne({email: req.body.email}, function(err: any, user: any) {
         if(err) {
-            return res.status(500).json({message: "Failed finding user in DB"});
+            return res.status(500).json({message: "Failed finding user in DB", error: err});
         }
         if(user) {
             // email is already in use
@@ -21,11 +21,12 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
             // return res.redirect("/signup");
             return res.status(409).json({message: "Email is already in use"});
         }
+        console.log("It keeps going....");
         // make sure username isn't already in use
         User.findOne({username: req.body.username}, function(err: any, user: any) {
             if(err) {
                 console.error("Failed finding user in DB");
-                return res.status(500).json({message: "Failed finding user in DB"});
+                return res.status(500).json({message: "Failed finding user in DB", error: err});
             }
             if(user) {
                 // username is already in use
@@ -37,13 +38,15 @@ export let postSignup = function(req: Request, res: Response, next: NextFunction
             // hash pw with bcrypt
             const newUser = new User({
                 username: req.body.username,
+                displayName: req.body.displayName,
                 password: req.body.password,
                 email: req.body.email
             });
+            // console.log(newUser);
             User.schema.statics.createUser(newUser, function(err: any, user: any) {
                 if(err) {
                     console.error("Failed creating user");
-                    throw err;
+                    return res.status(500).json({message: "Failed creating user", error: err});
                 } else {
                     console.log(user);
                     // TODO: log user in and send them to the home page
