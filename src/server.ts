@@ -7,6 +7,7 @@ import * as dotenv from "dotenv";
 import * as mongodb from "mongodb";
 import * as passport from "passport";
 import * as flash from "express-flash";
+import * as expressValidator from "express-validator";
 
 
 
@@ -64,11 +65,21 @@ app.use(session(sessionOptions));
 // setting up flash
 app.use(flash());
 
+app.use(function(req, res, next) {
+    // if there's a flash message in the session request, make it available in the response, then delete it
+    res.locals.sessionFlash = req.session.sessionFlash;
+    delete req.session.sessionFlash;
+    next();
+});
+
 // middleware for parsing application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }));
 
 // middleware for parsing application/json
 app.use(bodyParser.json());
+
+// middleware for validation
+app.use(expressValidator());
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -76,12 +87,15 @@ app.use(passport.session());
 
 // app routes
 app.get("/", function(req, res, next) {
-    res.json({message: "Welcome to the Home Page!"});
+    res.json({ message: "Welcome to the Home Page!", flashMessage: res.locals.sessionFlash });
 });
-app.post("/api/signup", UserController.postSignup);
+app.post("/api/signup", UserController.signupValidation ,UserController.postSignup);
+app.get("/signup", function(req, res) {
+    res.json({ message: "Welcome to the sign-up page!", flashMessage: res.locals.sessionFlash });
+});
 app.post("/api/login", UserController.postLogin);
 app.get("/login", function(req, res) {
-    res.json({message: "Welcome to the Login Page!"});
+    res.json({ message: "Welcome to the Login Page!", flashMessage: res.locals.sessionFlash });
 });
 
 // start express server

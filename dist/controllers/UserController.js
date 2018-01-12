@@ -3,11 +3,23 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var User_1 = require("../models/User");
 var passport = require("passport");
 var jwt = require("jsonwebtoken");
+var check_1 = require("express-validator/check");
 /**
  * POST /signup
  * Sign-up action
  */
 exports.postSignup = function (req, res, next) {
+    // form validation
+    var errors = check_1.validationResult(req);
+    console.log(errors.mapped());
+    if (!errors.isEmpty()) {
+        console.log("We got some errors for you boss!");
+        req.session.sessionFlash = {
+            type: "Error",
+            message: errors.mapped()
+        };
+        return res.status(500).redirect("/signup");
+    }
     // make sure the email isn't already in use
     User_1.default.findOne({ email: req.body.email }, function (err, user) {
         if (err) {
@@ -57,6 +69,27 @@ exports.postSignup = function (req, res, next) {
     });
 };
 /**
+ * POST /signup
+ * Validation Middleware
+ */
+exports.signupValidation = [
+    check_1.check("email").exists().withMessage("You must enter an email address.")
+        .isEmail().withMessage("You must enter a valid email address.")
+        .normalizeEmail(),
+    check_1.check("password").exists().withMessage("You must enter a password.")
+        .isLength({ min: 6 }).withMessage("Your password must be at least 6 characters long")
+        .matches(/^(?=.*\d)(?=.*[A-Z])(?=.*[a-z]).+$/).withMessage("Your password must contain a number, a capital letter, and a lowercase letter."),
+    check_1.check("confirmPassword").exists().withMessage("Please confirm your password")
+        .custom(function (value, _a) {
+        var req = _a.req;
+        return value === req.body.password;
+    }).withMessage("Your passwords do not match."),
+    check_1.check("displayName").exists().withMessage("You must enter a display name.")
+        .matches(/^[a-zA-Z0-9_-]*$/).withMessage("You may only use letters, numbers, and the symbols - and _."),
+    check_1.check("username").exists().withMessage("You must enter a username.")
+        .isAlphanumeric().withMessage("You may only use letters and numbers.")
+];
+/**
  * POST /login
  * Login action
  */
@@ -72,7 +105,11 @@ exports.postLogin = function (req, res, next) {
         }
         if (!user) {
             // TODO: Flash user error message
-            res.status(401).redirect("/login");
+            req.session.sessionFlash = {
+                type: "Error",
+                message: info
+            };
+            return res.status(401).redirect("/login");
         }
         // establish a session
         req.login(user, function (err) {
@@ -105,8 +142,11 @@ exports.postLogin = function (req, res, next) {
                         return res.status(500).json({ message: "The user was not found. Couldn't provide the intended user with a token" });
                     }
                 });
-                // TODO: redirect to user homepage
-                req.flash("AuthSuccess", "Successfully logged in!");
+                // redirect to user homepage
+                req.session.sessionFlash = {
+                    type: "Success",
+                    message: "Successfully logged in!"
+                };
                 return res.status(200).redirect("/");
             });
         });
