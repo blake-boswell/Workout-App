@@ -28,6 +28,9 @@ var userSchema = new mongoose.Schema({
     accessToken: {
         type: String
     },
+    verificationToken: {
+        type: String
+    },
     info: {
         height: String,
         weight: String,
@@ -81,6 +84,10 @@ var userSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    isActive: {
+        type: Boolean,
+        default: false
     }
 });
 userSchema.statics.createUser = function (newUser, callback) {

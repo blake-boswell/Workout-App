@@ -7,8 +7,10 @@ export interface IUser extends mongoose.Document {
     email: string;
     admin: boolean;
     accessToken?: string;
+    verificationToken: string;
     isDeleted: boolean;
     createdAt: Date;
+    isActive: boolean;
     createUser: (newUser: IUser, callback: any) => void;
     comparePassword: (candidatePassword: string, callback: any) => void;
 }

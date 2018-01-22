@@ -8,8 +8,10 @@ export interface IUser extends mongoose.Document {
     email: string;
     admin: boolean;
     accessToken?: string;
+    verificationToken: string;
     isDeleted: boolean;
     createdAt: Date;
+    isActive: boolean;
 
     createUser: (newUser: IUser, callback: any) => void;
     comparePassword: (candidatePassword: string, callback: any) => void;
@@ -40,6 +42,9 @@ const userSchema = new mongoose.Schema({
         default: false
     },
     accessToken: {
+        type: String
+    },
+    verificationToken: {
         type: String
     },
     info: {
@@ -95,6 +100,10 @@ const userSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    isActive: {
+        type: Boolean,
+        default: false
     }
 });
 

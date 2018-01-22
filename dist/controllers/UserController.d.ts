@@ -16,3 +16,13 @@ export declare let signupValidation: ValidationChain[];
  * Login action
  */
 export declare let postLogin: (req: Request, res: Response, next: NextFunction) => void;
+/**
+ * POST /logout
+ * Logout action
+ */
+export declare let postLogout: (req: Request, res: Response) => void;
+/**
+ * Send verification email
+ */
+export declare let sendVerificationEmail: (receivers: String, link: String, callback: any) => void;
+export declare let verify: (req: Request, res: Response) => void;

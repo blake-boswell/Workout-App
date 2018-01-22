@@ -66,16 +66,20 @@ app.use(passport.initialize());
 app.use(passport.session());
 // app routes
 app.get("/", function (req, res, next) {
+    console.log("Passport User: ", req.user);
+    console.log("Passport is Auth: ", req.isAuthenticated());
     res.json({ message: "Welcome to the Home Page!", flashMessage: res.locals.sessionFlash });
 });
 app.post("/api/signup", UserController.signupValidation, UserController.postSignup);
 app.get("/signup", function (req, res) {
     res.json({ message: "Welcome to the sign-up page!", flashMessage: res.locals.sessionFlash });
 });
+app.get("/verify/:id", UserController.verify);
 app.post("/api/login", UserController.postLogin);
 app.get("/login", function (req, res) {
     res.json({ message: "Welcome to the Login Page!", flashMessage: res.locals.sessionFlash });
 });
+app.post("/api/logout", UserController.postLogout);
 // start express server
 app.listen(port, function () {
     console.log("Connected to port " + port);
