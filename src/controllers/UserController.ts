@@ -17,7 +17,7 @@ import * as crypto from "crypto";
 export let postSignup = (req: Request, res: Response, next: NextFunction) => {
 
     // form validation
-
+    // Check for errors
     const errors = validationResult(req);
     console.log(errors.mapped());
     if (!errors.isEmpty()) {
@@ -54,35 +54,32 @@ export let postSignup = (req: Request, res: Response, next: NextFunction) => {
                 return res.status(409).json({message: "Username is already in use"});
             }
             // email && username are unique
-            // hash pw with bcrypt
-            const newUser = new User({
-                username: req.body.username,
-                displayName: req.body.displayName,
-                password: req.body.password,
-                email: req.body.email
-            });
-            // console.log(newUser);
-            User.schema.statics.createUser(newUser, (err: any, user: any) => {
-                if(err) {
-                    console.error("Failed creating user");
-                    return res.status(500).json({message: "Failed creating user", error: err});
-                } else {
-                    // console.log(user);
-                    // TODO: log user in and send them to the home page
-                    // res.redirect("../login");
-                    // Create a verification token
-                    let verificationToken: String;
-                    crypto.randomBytes(20, (err, buf) => {
+             // Create a verification token to email
+             let verificationToken: String;
+             crypto.randomBytes(20, (err, buf) => {
+                 if(err) {
+                     req.session.sessionFlash = {
+                         type: "Error",
+                         message: "Error generating random token! " + err
+                     };
+                     res.status(500).redirect("/signup");
+                 } else if(buf) {
+                    verificationToken = buf.toString("hex");
+                    const newUser = new User({
+                        username: req.body.username,
+                        displayName: req.body.displayName,
+                        password: req.body.password,
+                        email: req.body.email,
+                        verificationToken: verificationToken
+                    });
+                    User.schema.statics.createUser(newUser, (err: any, user: any) => {
                         if(err) {
-                            req.session.sessionFlash = {
-                                type: "Error",
-                                message: "Error generating random token! " + err
-                            };
-                            res.status(500).redirect("/signup");
-                        } else if(buf) {
-                            verificationToken = buf.toString("hex");
-                            user.verificationToken = verificationToken;
-                            user.save();
+                            console.error("Failed creating user");
+                            return res.status(500).json({message: "Failed creating user", error: err});
+                        } else {
+                            // console.log(user);
+                            // TODO: log user in and send them to the home page
+                            // res.redirect("../login");
                             const link = "http://" + req.get("host") + "/verify/" + verificationToken;
                             // Send verification email
                             sendVerificationEmail(user.email, link, (err: any, data: any) => {
@@ -101,7 +98,7 @@ export let postSignup = (req: Request, res: Response, next: NextFunction) => {
                             });
                         }
                     });
-                }
+                 }
             });
         });
     });
@@ -131,62 +128,84 @@ export let signupValidation: ValidationChain [] = [
  * Login action
  */
 export let postLogin = (req: Request, res: Response, next: NextFunction) => {
-
-    passport.authenticate("local", (err: Error, user: UserType, info: any) => {
-        // user and err are retrieved through the done callback from the LocalStrategy in /config/passport file
-        if(info != undefined) {
-            console.log("[Local Authenticate]You got some info: ");
-            console.log(info);
-        }
+    User.findOne({email: req.body.email}, (err, user) => {
         if(err) {
             return next(err);
         }
+
         if(!user) {
-            // TODO: Flash user error message
             req.session.sessionFlash = {
                 type: "Error",
-                message: info
+                message: "A user with that email does not exist."
             };
-            return res.status(401).redirect("/login");
+            return res.status(500).redirect("/login");
         }
-        // establish a session
-        req.login(user, (err) => {
+
+        if(!user.isActive) {
+            // Deny access
+            req.session.sessionFlash = {
+                type: "Error",
+                message: "You must activate your account with the link sent to your email first."
+            };
+            return res.status(500).redirect("/login");
+        }
+
+        // User has activated account
+        passport.authenticate("local", (err: Error, user: UserType, info: any) => {
+            // user and err are retrieved through the done callback from the LocalStrategy in /config/passport file
+            if(info != undefined) {
+                console.log("[Local Authenticate]You got some info: ");
+                console.log(info);
+            }
             if(err) {
                 return next(err);
             }
-            // Success! Redirect user & give them a web token
-            // The payload contains all the data we want to be able to access locally that shouldn't change
-            const payload = {
-                "userID": user._id,
-                "admin": user.admin
-            };
-            jwt.sign(payload, <string>process.env.TOKEN_SECRET, {expiresIn: 60*15, issuer: "Boz", subject: "AuthenticationToken"}, (err, token) => {
+            if(!user) {
+                req.session.sessionFlash = {
+                    type: "Error",
+                    message: info
+                };
+                return res.status(401).redirect("/login");
+            }
+            // establish a session
+            req.login(user, (err) => {
                 if(err) {
                     return next(err);
                 }
-                // Persist token (store to localStorage and/or cookie on the front end)
-                // All new requests should verify the web token
-                // When token is valid, respond, otherwise send an error
-                console.log("Token created!");
-                User.findOne(user, (err, doc) => {
+                // Success! Redirect user & give them a web token
+                // The payload contains all the data we want to be able to access locally that shouldn't change
+                const payload = {
+                    "userID": user._id,
+                    "admin": user.admin
+                };
+                jwt.sign(payload, <string>process.env.TOKEN_SECRET, {expiresIn: 60*15, issuer: "Boz", subject: "AuthenticationToken"}, (err, token) => {
                     if(err) {
                         return next(err);
-                    } else if(doc) {
-                        doc.accessToken = "Bearer " + token;
-                        doc.save();
-                    } else {
-                        return res.status(500).json({message: "The user was not found. Couldn't provide the intended user with a token"});
                     }
+                    // Persist token (store to localStorage and/or cookie on the front end)
+                    // All new requests should verify the web token
+                    // When token is valid, respond, otherwise send an error
+                    console.log("Token created!");
+                    User.findOne(user, (err, user) => {
+                        if(err) {
+                            return next(err);
+                        } else if(user) {
+                            user.accessToken = "Bearer " + token;
+                            user.save();
+                        } else {
+                            return res.status(500).json({message: "The user was not found. Couldn't provide the intended user with a token"});
+                        }
+                    });
+                    // redirect to user homepage
+                    req.session.sessionFlash = {
+                        type: "Success",
+                        message: "Successfully logged in!"
+                    };
+                    return res.status(200).redirect("/");
                 });
-                // redirect to user homepage
-                req.session.sessionFlash = {
-                    type: "Success",
-                    message: "Successfully logged in!"
-                };
-                return res.status(200).redirect("/");
             });
-        });
-    })(req, res, next);
+        })(req, res, next);
+    });
 };
 
 /**
@@ -203,48 +222,9 @@ export let postLogout = (req: Request, res: Response) => {
  * Send verification email
  */
 export let sendVerificationEmail = (receivers: String, link: String, callback: any) => {
-    // Generate test SMTP service account from ethereal.email
-    // Only needed if you don't have a real mail account for testing
-    // nodemailer.createTestAccount((err, account) => {
-    //     // create reusable transporter object using the default SMTP transport
-    //     console.log("Account: ", account);
-    //     const transporter = nodemailer.createTransport({
-    //         host: "smtp.gmail.com",
-    //         port: 465,
-    //         secure: true, // true for 465, false for other ports
-    //         auth: {
-    //             user: "bozzy.test.service@gmail.com",
-    //             pass: process.env.EMAIL_PW
-    //         }
-    //     });
 
-    //     // setup email data with unicode symbols
-    //     const mailOptions = {
-    //         from: "\"Bozzy B 👻\" <bozzy.test.service@gmail.com>", // sender address
-    //         to: receivers, // list of receivers
-    //         subject: "Hello ✔", // Subject line
-    //         text: "Hello world?", // plain text body
-    //         html: "<b>Hello world?</b>" // html body
-    //     };
-
-    //     // send mail with defined transport object
-    //     transporter.sendMail(mailOptions, (error, info) => {
-    //         if (error) {
-    //             return console.log(error);
-    //         }
-    //         console.log("Message sent: %s", info.messageId);
-    //         // Preview only available when sending through an Ethereal account
-    //         console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-
-    //         // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@blurdybloop.com>
-    //         // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
-    //     });
-    // });
-
-   // var mailgun = require("mailgun-js");
     const api_key = process.env.MAIL_API_KEY;
     const DOMAIN = process.env.MAIL_TEST_DOMAIN;
-    // var mailgun = require('mailgun-js')({apiKey: api_key, domain: DOMAIN});
     const mailgun = new Mailgun({apiKey: api_key, domain: DOMAIN});
 
     console.log(mailgun);
@@ -274,11 +254,23 @@ export let verify = (req: Request, res: Response) => {
         if(!user.isActive) {
             user.isActive = true;
             user.verificationToken = undefined;
-            user.save();
-            const html = "<h1>SUCCESS!</h1><br /><h3>" + user.username + ", you are now an active user!</h3>";
+            console.log(user);
+            user.save((err) => {
+                if(err) {
+                    req.session.sessionFlash = {
+                        type: "Error",
+                        message: err
+                    };
+                    return res.status(401).redirect("/login");
+                }
+                console.log(user.username + " has been activated.");
+                const html = "<h1>SUCCESS!</h1><br /><h3>" + user.username + ", you are now an active user!</h3>";
+                return res.send(html);
+            });
+        } else {
+            const html = "<h1>This user is already activated</h1>";
+            console.log(user.username + " attempted to activate his/her account, but it has already been activated.");
             return res.send(html);
         }
-        const html = "<h1>This user is already activated</h1>";
-        return res.send(html);
     });
 };
