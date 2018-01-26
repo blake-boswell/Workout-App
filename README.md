@@ -4,5 +4,5 @@
 > npm install
 
 To run:
-> nodemon start
+> npm start
 ⋅⋅⋅ This will compile the TypeScript files, run the server, and watch for any file changes to recompile the TypeScript files and restart the server
