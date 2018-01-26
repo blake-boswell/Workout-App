@@ -1,2 +1,8 @@
-Workout Application in progress...
+# Workout Application in progress...
 
+## Usage
+> npm install
+
+To run:
+> nodemon start
+⋅⋅⋅ This will compile the TypeScript files, run the server, and watch for any file changes to recompile the TypeScript files and restart the server
