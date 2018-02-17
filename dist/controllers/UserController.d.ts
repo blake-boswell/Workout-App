@@ -70,4 +70,9 @@ export declare let sendVerificationEmail: (receiver: String, link: String, callb
  * @param callback callback with the parameters error and data
  */
 export declare let forgotPasswordEmail: (receiver: String, link: String, callback: any) => void;
+/**
+ * Verify and activate user account
+ * @param req Request object
+ * @param res Response object
+ */
 export declare let verify: (req: Request, res: Response) => void;

@@ -145,7 +145,7 @@ export let postLogin = (req: Request, res: Response, next: NextFunction) => {
                 type: "Error",
                 message: "A user with that email does not exist."
             };
-            return res.status(500).redirect("/login");
+            return res.status(404).redirect("/login");
         }
 
         if(!user.isActive) {
@@ -179,37 +179,39 @@ export let postLogin = (req: Request, res: Response, next: NextFunction) => {
                 if(err) {
                     return next(err);
                 }
-                // Success! Redirect user & give them a web token
-                // The payload contains all the data we want to be able to access locally that shouldn't change
-                const payload = {
-                    "userID": user._id,
-                    "admin": user.admin
-                };
-                jwt.sign(payload, <string>process.env.TOKEN_SECRET, {expiresIn: 60*15, issuer: "Boz", subject: "AuthenticationToken"}, (err, token) => {
-                    if(err) {
-                        return next(err);
-                    }
-                    // Persist token (store to localStorage and/or cookie on the front end)
-                    // All new requests should verify the web token
-                    // When token is valid, respond, otherwise send an error
-                    console.log("Token created!");
-                    User.findOne(user, (err, user) => {
+                if(user) {
+                    // Success! Redirect user & give them a web token
+                    // The payload contains all the data we want to be able to access locally that shouldn't change
+                    const payload = {
+                        "userID": user._id,
+                        "admin": user.admin
+                    };
+                    jwt.sign(payload, <string>process.env.TOKEN_SECRET, {expiresIn: 60*15, issuer: "Boz", subject: "AuthenticationToken"}, (err, token) => {
                         if(err) {
                             return next(err);
-                        } else if(user) {
-                            user.accessToken = "Bearer " + token;
-                            user.save();
-                        } else {
-                            return res.status(500).json({message: "The user was not found. Couldn't provide the intended user with a token"});
                         }
+                        // Persist token (store to localStorage and/or cookie on the front end)
+                        // All new requests should verify the web token
+                        // When token is valid, respond, otherwise send an error
+                        console.log("Token created!");
+                        User.findOne(user, (err, user) => {
+                            if(err) {
+                                return next(err);
+                            } else if(user) {
+                                user.accessToken = "Bearer " + token;
+                                user.save();
+                            } else {
+                                return res.status(500).json({message: "The user was not found. Couldn't provide the intended user with a token"});
+                            }
+                        });
+                        // redirect to user homepage
+                        req.session.sessionFlash = {
+                            type: "Success",
+                            message: "Successfully logged in!"
+                        };
+                        return res.status(200).redirect("/");
                     });
-                    // redirect to user homepage
-                    req.session.sessionFlash = {
-                        type: "Success",
-                        message: "Successfully logged in!"
-                    };
-                    return res.status(200).redirect("/");
-                });
+                }
             });
         })(req, res, next);
     });
@@ -242,27 +244,28 @@ export let postForgotPassword = (req: Request, res: Response) => {
     // Generate JWT
     const userEmail = req.body.email;
     User.findOne({ email: userEmail }, (err, user) => {
-        const payload = { "userID": user._id };
-        const options = {
-            expiresIn: 60*15, // 15 minutes
-            issuer: "Boz",
-            subject: "Forgot Password"
-        };
         // Append JWT to email
-        jwt.sign(payload, process.env.TOKEN_SECRET, options, (err, token) => {
-            // error handler
+        generateRandomString((err, token) => {
             if(err)
                 return errorHandler(req, res, 500, err, "forgot");
-            const link = "http://" + req.get("host") + "/update/password/" + token;
-            // Set the token on the user for verification (want to know if it is this specific user)
-            // user.resetToken = token;
-            // user.save();
-            // Send email
-            forgotPasswordEmail(userEmail, link, (err) => {
-                if(err)
-                    return errorHandler(req, res, 500, err, "forgot");
-                return res.send({ message: "Email sent!" });
-            });
+            if(user) {
+                const link = "http://" + req.get("host") + "/update/password/" + token;
+                // Set the token on the user for verification
+                user.resetToken = token;
+                user.save((err) => {
+                    if(err)
+                        return errorHandler(req, res, 500, err, "forgot");
+                    // Send email
+                    forgotPasswordEmail(userEmail, link, (err) => {
+                        if(err)
+                            return errorHandler(req, res, 500, err, "forgot");
+                        return res.send({ message: "Email sent!" });
+                    });
+                });
+            } else {
+                const err = new Error("Could not find a user with that email address");
+                return errorHandler(req, res, 404, err, "forgot");
+            }
         });
     });
 };
@@ -274,26 +277,26 @@ export let postForgotPassword = (req: Request, res: Response) => {
  */
 export let postChangePasswordAction = (req: Request, res: Response) => {
     // Grab token
-    const key = req.params.token;
-    // Decode the token
-    jwt.verify(key, process.env.TOKEN_SECRET, (err, decoded) => {
+    const token = req.params.token;
+    // Find user by token
+    User.findOne({ resetToken: token }, (err: any, user: UserType) => {
         if(err)
-            return errorHandler(req, res, 500, err);
-        console.log("Decoded Payload", decoded);
-        // Find user by ID
-        User.findById(decoded.userID, (err: any, user: UserType) => {
-            if(err)
-                return errorHandler(req, res, 404, err, "404");
+            return errorHandler(req, res, 404, err, "404");
+        if(user) {
             // Update Password
             console.log("Updating PW..");
             user.password = req.body.newPassword;
+            // Remove token
+            user.resetToken = undefined;
             user.save(function(err) {
                 if(err)
                     return errorHandler(req, res, 500, err);
-                decoded.expiresIn = 0;
                 return res.send({message: "Password successfully updated!"});
             });
-        });
+        } else {
+            // Redirect to 404 page
+            return res.send({ message: "404 Page Not Found." });
+        }
     });
 };
 
@@ -365,10 +368,19 @@ export let forgotPasswordEmail = (receiver: String, link: String, callback: any)
     sendEmail(to, subject, message, callback);
 };
 
+/**
+ * Verify and activate user account
+ * @param req Request object
+ * @param res Response object
+ */
 export let verify = (req: Request, res: Response) => {
     User.findOne({verificationToken: req.params.id}, (err, user) => {
         if(err) {
             return res.send(err);
+        }
+        if(!user) {
+            const err = new Error("User not found.");
+            return errorHandler(req, res, 404, err, )
         }
         if(!user.isActive) {
             user.isActive = true;
@@ -403,4 +415,13 @@ const errorHandler = (req: Request, res: Response, statusCode: number, err: Erro
         res.status(statusCode).redirect("/" + redirectPage);
     }
     console.log("Error in errorHandler\nError: ", err);
+};
+
+const generateRandomString = (callback) => {
+    crypto.randomBytes(20, (err, buf) => {
+        if(err)
+            return callback(err);
+        const token = buf.toString("hex");
+        return callback(undefined, token);
+    });
 };

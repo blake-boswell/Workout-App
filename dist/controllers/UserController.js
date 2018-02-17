@@ -139,7 +139,7 @@ exports.postLogin = function (req, res, next) {
                 type: "Error",
                 message: "A user with that email does not exist."
             };
-            return res.status(500).redirect("/login");
+            return res.status(404).redirect("/login");
         }
         if (!user.isActive) {
             // Deny access
@@ -171,39 +171,41 @@ exports.postLogin = function (req, res, next) {
                 if (err) {
                     return next(err);
                 }
-                // Success! Redirect user & give them a web token
-                // The payload contains all the data we want to be able to access locally that shouldn't change
-                var payload = {
-                    "userID": user._id,
-                    "admin": user.admin
-                };
-                jwt.sign(payload, process.env.TOKEN_SECRET, { expiresIn: 60 * 15, issuer: "Boz", subject: "AuthenticationToken" }, function (err, token) {
-                    if (err) {
-                        return next(err);
-                    }
-                    // Persist token (store to localStorage and/or cookie on the front end)
-                    // All new requests should verify the web token
-                    // When token is valid, respond, otherwise send an error
-                    console.log("Token created!");
-                    User_1.default.findOne(user, function (err, user) {
+                if (user) {
+                    // Success! Redirect user & give them a web token
+                    // The payload contains all the data we want to be able to access locally that shouldn't change
+                    var payload = {
+                        "userID": user._id,
+                        "admin": user.admin
+                    };
+                    jwt.sign(payload, process.env.TOKEN_SECRET, { expiresIn: 60 * 15, issuer: "Boz", subject: "AuthenticationToken" }, function (err, token) {
                         if (err) {
                             return next(err);
                         }
-                        else if (user) {
-                            user.accessToken = "Bearer " + token;
-                            user.save();
-                        }
-                        else {
-                            return res.status(500).json({ message: "The user was not found. Couldn't provide the intended user with a token" });
-                        }
+                        // Persist token (store to localStorage and/or cookie on the front end)
+                        // All new requests should verify the web token
+                        // When token is valid, respond, otherwise send an error
+                        console.log("Token created!");
+                        User_1.default.findOne(user, function (err, user) {
+                            if (err) {
+                                return next(err);
+                            }
+                            else if (user) {
+                                user.accessToken = "Bearer " + token;
+                                user.save();
+                            }
+                            else {
+                                return res.status(500).json({ message: "The user was not found. Couldn't provide the intended user with a token" });
+                            }
+                        });
+                        // redirect to user homepage
+                        req.session.sessionFlash = {
+                            type: "Success",
+                            message: "Successfully logged in!"
+                        };
+                        return res.status(200).redirect("/");
                     });
-                    // redirect to user homepage
-                    req.session.sessionFlash = {
-                        type: "Success",
-                        message: "Successfully logged in!"
-                    };
-                    return res.status(200).redirect("/");
-                });
+                }
             });
         })(req, res, next);
     });
@@ -233,27 +235,29 @@ exports.postForgotPassword = function (req, res) {
     // Generate JWT
     var userEmail = req.body.email;
     User_1.default.findOne({ email: userEmail }, function (err, user) {
-        var payload = { "userID": user._id };
-        var options = {
-            expiresIn: 60 * 15,
-            issuer: "Boz",
-            subject: "Forgot Password"
-        };
         // Append JWT to email
-        jwt.sign(payload, process.env.TOKEN_SECRET, options, function (err, token) {
-            // error handler
+        generateRandomString(function (err, token) {
             if (err)
                 return errorHandler(req, res, 500, err, "forgot");
-            var link = "http://" + req.get("host") + "/update/password/" + token;
-            // Set the token on the user for verification (want to know if it is this specific user)
-            // user.resetToken = token;
-            // user.save();
-            // Send email
-            exports.forgotPasswordEmail(userEmail, link, function (err) {
-                if (err)
-                    return errorHandler(req, res, 500, err, "forgot");
-                return res.send({ message: "Email sent!" });
-            });
+            if (user) {
+                var link_1 = "http://" + req.get("host") + "/update/password/" + token;
+                // Set the token on the user for verification
+                user.resetToken = token;
+                user.save(function (err) {
+                    if (err)
+                        return errorHandler(req, res, 500, err, "forgot");
+                    // Send email
+                    exports.forgotPasswordEmail(userEmail, link_1, function (err) {
+                        if (err)
+                            return errorHandler(req, res, 500, err, "forgot");
+                        return res.send({ message: "Email sent!" });
+                    });
+                });
+            }
+            else {
+                var err_1 = new Error("Could not find a user with that email address");
+                return errorHandler(req, res, 404, err_1, "forgot");
+            }
         });
     });
 };
@@ -264,26 +268,27 @@ exports.postForgotPassword = function (req, res) {
  */
 exports.postChangePasswordAction = function (req, res) {
     // Grab token
-    var key = req.params.token;
-    // Decode the token
-    jwt.verify(key, process.env.TOKEN_SECRET, function (err, decoded) {
+    var token = req.params.token;
+    // Find user by token
+    User_1.default.findOne({ resetToken: token }, function (err, user) {
         if (err)
-            return errorHandler(req, res, 500, err);
-        console.log("Decoded Payload", decoded);
-        // Find user by ID
-        User_1.default.findById(decoded.userID, function (err, user) {
-            if (err)
-                return errorHandler(req, res, 404, err, "404");
+            return errorHandler(req, res, 404, err, "404");
+        if (user) {
             // Update Password
             console.log("Updating PW..");
             user.password = req.body.newPassword;
+            // Remove token
+            user.resetToken = undefined;
             user.save(function (err) {
                 if (err)
                     return errorHandler(req, res, 500, err);
-                decoded.expiresIn = 0;
                 return res.send({ message: "Password successfully updated!" });
             });
-        });
+        }
+        else {
+            // Redirect to 404 page
+            return res.send({ message: "404 Page Not Found." });
+        }
     });
 };
 exports.getChangePassword = function (req, res) {
@@ -345,10 +350,19 @@ exports.forgotPasswordEmail = function (receiver, link, callback) {
     var message = "Please click on the following link to change your password\n" + link;
     exports.sendEmail(to, subject, message, callback);
 };
+/**
+ * Verify and activate user account
+ * @param req Request object
+ * @param res Response object
+ */
 exports.verify = function (req, res) {
     User_1.default.findOne({ verificationToken: req.params.id }, function (err, user) {
         if (err) {
             return res.send(err);
+        }
+        if (!user) {
+            var err_2 = new Error("User not found.");
+            return errorHandler(req, res, 404, err_2);
         }
         if (!user.isActive) {
             user.isActive = true;
@@ -383,4 +397,12 @@ var errorHandler = function (req, res, statusCode, err, redirectPage) {
         res.status(statusCode).redirect("/" + redirectPage);
     }
     console.log("Error in errorHandler\nError: ", err);
+};
+var generateRandomString = function (callback) {
+    crypto.randomBytes(20, function (err, buf) {
+        if (err)
+            return callback(err);
+        var token = buf.toString("hex");
+        return callback(undefined, token);
+    });
 };
