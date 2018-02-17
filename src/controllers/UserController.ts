@@ -77,31 +77,30 @@ export let postSignup = (req: Request, res: Response, next: NextFunction) => {
                         email: req.body.email,
                         verificationToken: verificationToken
                     });
-                    User.schema.statics.createUser(newUser, (err: any, user: any) => {
+                    newUser.save(function(err) {
                         if(err) {
                             console.error("Failed creating user");
                             return res.status(500).json({message: "Failed creating user", error: err});
-                        } else {
-                            // console.log(user);
-                            // TODO: log user in and send them to the home page
-                            // res.redirect("../login");
-                            const link = "http://" + req.get("host") + "/verify/" + verificationToken;
-                            // Send verification email
-                            sendVerificationEmail(user.email, link, (err: any, data: any) => {
-                                if(err) {
-                                    req.session.sessionFlash = {
-                                        type: "Error",
-                                        message: "Error sending verification email! " + err
-                                    };
-                                    res.status(500).redirect("/signup");
-                                }
-                                req.session.sessionFlash = {
-                                    type: "Success",
-                                    message: "Success! Check your email for a verification link " + newUser.username
-                                };
-                                res.status(200).redirect("/login");
-                            });
                         }
+                        // console.log(user);
+                        // TODO: log user in and send them to the home page
+                        // res.redirect("../login");
+                        const link = "http://" + req.get("host") + "/verify/" + verificationToken;
+                        // Send verification email
+                        sendVerificationEmail(user.email, link, (err: any, data: any) => {
+                            if(err) {
+                                req.session.sessionFlash = {
+                                    type: "Error",
+                                    message: "Error sending verification email! " + err
+                                };
+                                res.status(500).redirect("/signup");
+                            }
+                            req.session.sessionFlash = {
+                                type: "Success",
+                                message: "Success! Check your email for a verification link " + newUser.username
+                            };
+                            res.status(200).redirect("/login");
+                        });
                     });
                  }
             });
@@ -227,10 +226,94 @@ export let postLogout = (req: Request, res: Response) => {
 };
 
 /**
- * Send verification email
+ * GET /forgot/
+ * @param req Request Object
+ * @param res Response Object
  */
-export let sendVerificationEmail = (receivers: String, link: String, callback: any) => {
+export let getForgotPassword = (req: Request, res: Response) => {
+    res.send({message: "Forgot Password Page!"});
+};
 
+/**
+ * POST /forgot
+ * Forgot password action
+ */
+export let postForgotPassword = (req: Request, res: Response) => {
+    // Generate JWT
+    const userEmail = req.body.email;
+    User.findOne({ email: userEmail }, (err, user) => {
+        const payload = { "userID": user._id };
+        const options = {
+            expiresIn: 60*15, // 15 minutes
+            issuer: "Boz",
+            subject: "Forgot Password"
+        };
+        // Append JWT to email
+        jwt.sign(payload, process.env.TOKEN_SECRET, options, (err, token) => {
+            // error handler
+            if(err)
+                return errorHandler(req, res, 500, err, "forgot");
+            const link = "http://" + req.get("host") + "/update/password/" + token;
+            // Set the token on the user for verification (want to know if it is this specific user)
+            // user.resetToken = token;
+            // user.save();
+            // Send email
+            forgotPasswordEmail(userEmail, link, (err) => {
+                if(err)
+                    return errorHandler(req, res, 500, err, "forgot");
+                return res.send({ message: "Email sent!" });
+            });
+        });
+    });
+};
+
+/**
+ * POST action /update/password/:token
+ * @param req Request Object
+ * @param res Response Object
+ */
+export let postChangePasswordAction = (req: Request, res: Response) => {
+    // Grab token
+    const key = req.params.token;
+    // Decode the token
+    jwt.verify(key, process.env.TOKEN_SECRET, (err, decoded) => {
+        if(err)
+            return errorHandler(req, res, 500, err);
+        console.log("Decoded Payload", decoded);
+        // Find user by ID
+        User.findById(decoded.userID, (err: any, user: UserType) => {
+            if(err)
+                return errorHandler(req, res, 404, err, "404");
+            // Update Password
+            console.log("Updating PW..");
+            user.password = req.body.newPassword;
+            user.save(function(err) {
+                if(err)
+                    return errorHandler(req, res, 500, err);
+                decoded.expiresIn = 0;
+                return res.send({message: "Password successfully updated!"});
+            });
+        });
+    });
+};
+
+export let getChangePassword = (req: Request, res: Response) => {
+
+};
+
+export let generatePasswordUpdatePage = (req: Request, res: Response) => {
+    // Generate the Password Update Form
+    // res.sendFile("updatePassword");
+};
+
+/**
+ * Send email
+ * @param to who the email is sent to
+ * @param subject the subject of the email
+ * @param message the contents of the email
+ * @param callback callback with the parameters error and data
+ */
+export let sendEmail = (to: String, subject: String, message: string, callback: any) => {
     const api_key = process.env.MAIL_API_KEY;
     const DOMAIN = process.env.MAIL_TEST_DOMAIN;
     const mailgun = new Mailgun({apiKey: api_key, domain: DOMAIN});
@@ -238,12 +321,12 @@ export let sendVerificationEmail = (receivers: String, link: String, callback: a
     console.log(mailgun);
     const data = {
       from: "Bozzy <blake.w.boswell@gmail.com>",
-      to: receivers,
-      subject: "Hello",
-      text: "Please click the following link to verify and activate your account\n" + link
+      to: to,
+      subject: subject,
+      text: message
     };
 
-    mailgun.messages().send(data, function (err, body) {
+    mailgun.messages().send(data, (err, body) => {
         if(err) {
             console.log("FAILURE!\n" + err);
             callback(err, undefined);
@@ -252,6 +335,34 @@ export let sendVerificationEmail = (receivers: String, link: String, callback: a
             callback(undefined, body);
         }
     });
+};
+
+/**
+ * Send verification email
+ * @param receiver who the email is sent to
+ * @param link email link to verify account
+ * @param callback callback with the parameters error and data
+ */
+export let sendVerificationEmail = (receiver: String, link: String, callback: any) => {
+    const to = receiver;
+    const subject = "Verify Email";
+    const message = "Please click the following link to verify and activate your account\n" + link;
+
+    sendEmail(to, subject, message, callback);
+};
+
+/**
+ * Send forgot password email link
+ * @param receiver who the email is sent to
+ * @param link email link to verify account
+ * @param callback callback with the parameters error and data
+ */
+export let forgotPasswordEmail = (receiver: String, link: String, callback: any) => {
+    const to = receiver;
+    const subject = "Forgot Password";
+    const message = "Please click on the following link to change your password\n" + link;
+
+    sendEmail(to, subject, message, callback);
 };
 
 export let verify = (req: Request, res: Response) => {
@@ -281,4 +392,15 @@ export let verify = (req: Request, res: Response) => {
             return res.send(html);
         }
     });
+};
+
+const errorHandler = (req: Request, res: Response, statusCode: number, err: Error, redirectPage?: String) => {
+    req.session.sessionFlash = {
+        type: "Error",
+        message: err
+    };
+    if(redirectPage) {
+        res.status(statusCode).redirect("/" + redirectPage);
+    }
+    console.log("Error in errorHandler\nError: ", err);
 };

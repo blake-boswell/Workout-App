@@ -27,7 +27,7 @@ passport.deserializeUser(function(id, done) {
 // // Sends an error (undefined if there is none), a user (false if there is none) through the done callback
 passport.use(new LocalStrategy({ usernameField: "email" },
     function(email: string, password: string, done: any) {
-        User.findOne({ email: email }, function(err: any, user: any) {
+        User.findOne({ email: email }, function(err: Error, user: UserType) {
             if(err) {
                 return done(err);
             }

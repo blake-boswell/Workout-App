@@ -1,4 +1,5 @@
 "use strict";
+var _this = this;
 Object.defineProperty(exports, "__esModule", { value: true });
 var mongoose = require("mongoose");
 var bcrypt = require("bcrypt");
@@ -29,6 +30,9 @@ var userSchema = new mongoose.Schema({
         type: String
     },
     verificationToken: {
+        type: String
+    },
+    resetToken: {
         type: String
     },
     info: {
@@ -90,27 +94,61 @@ var userSchema = new mongoose.Schema({
         default: false
     }
 });
-userSchema.statics.createUser = function (newUser, callback) {
+// Password hashing middleware
+// inspired by https://www.mongodb.com/blog/post/password-authentication-with-mongoose-part-1
+// MUST USE .save TO HASH THE PW
+userSchema.pre("save", function (next) {
+    var user = this;
+    // Hash pw if it is new/modified
+    if (!user.isModified("password"))
+        return next();
+    // Gen salt and hash pw
     bcrypt.genSalt(10, function (err, salt) {
-        if (err) {
-            console.error("Failed generating salt.");
-            throw err;
-        }
-        bcrypt.hash(newUser.password, salt, function (err, hash) {
-            if (err) {
-                console.error("Could not hash password");
-            }
-            else {
-                newUser.password = hash;
-                newUser.save(callback);
-            }
+        if (err)
+            return next(err);
+        bcrypt.hash(user.password, salt, function (err, hash) {
+            if (err)
+                return next(err);
+            // Override the pw with the hash
+            user.password = hash;
+            next();
         });
     });
-};
+});
 userSchema.methods.comparePassword = function (candidatePassword, callback) {
     // compare pw to DB pw
     bcrypt.compare(candidatePassword, this.password, function (err, isMatch) {
-        callback(err, isMatch);
+        if (err)
+            return callback(err);
+        callback(undefined, isMatch);
+    });
+};
+userSchema.methods.updatePassword = function (newPassword, callback) {
+    // console.log("This ", this);
+    hashPassword(newPassword, function (err, hash) {
+        if (err)
+            callback(err);
+        else {
+            // Keep working in here...
+            console.log("This ", _this, "\nModel ", _this.model);
+            _this.default.model.password = hash;
+            // this.save();
+            callback(undefined);
+        }
+    });
+};
+var hashPassword = function (password, callback) {
+    bcrypt.genSalt(10, function (err, salt) {
+        if (err)
+            callback(err, undefined);
+        else {
+            bcrypt.hash(password, salt, function (err, hash) {
+                if (err)
+                    callback(err, undefined);
+                else
+                    callback(undefined, hash);
+            });
+        }
     });
 };
 var User = mongoose.model("User", userSchema);

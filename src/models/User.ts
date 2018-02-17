@@ -8,7 +8,8 @@ export interface IUser extends mongoose.Document {
     email: string;
     admin: boolean;
     accessToken?: string;
-    verificationToken: string;
+    verificationToken?: string;
+    resetToken?: string;
     isDeleted: boolean;
     createdAt: Date;
     isActive: boolean;
@@ -45,6 +46,9 @@ const userSchema = new mongoose.Schema({
         type: String
     },
     verificationToken: {
+        type: String
+    },
+    resetToken: {
         type: String
     },
     info: {
@@ -107,29 +111,68 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-userSchema.statics.createUser = function(newUser: UserType, callback: any) {
-    bcrypt.genSalt(10, function(err, salt) {
-        if(err) {
-            console.error("Failed generating salt.");
-            throw err;
-        }
-        bcrypt.hash(newUser.password, salt, function(err, hash) {
-            if(err) {
-                console.error("Could not hash password");
-            } else {
-                newUser.password = hash;
-                newUser.save(callback);
-            }
+// Password hashing middleware
+// inspired by https://www.mongodb.com/blog/post/password-authentication-with-mongoose-part-1
+// MUST USE .save TO HASH THE PW
+userSchema.pre("save", function(next) {
+    const user = this;
+    // Hash pw if it is new/modified
+    if(!user.isModified("password"))
+        return next();
+
+    // Gen salt and hash pw
+    bcrypt.genSalt(10, (err, salt) => {
+        if(err)
+            return next(err);
+        bcrypt.hash(user.password, salt, (err, hash) => {
+            if(err)
+                return next(err);
+            // Override the pw with the hash
+            user.password = hash;
+            next();
         });
+    });
+});
+
+userSchema.methods.comparePassword = function(candidatePassword: String, callback) {
+    // compare pw to DB pw
+    bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
+        if(err)
+            return callback(err);
+        callback(undefined, isMatch);
     });
 };
 
-userSchema.methods.comparePassword = function(candidatePassword: String, callback: (err: any, isMatch: boolean) => {}) {
-    // compare pw to DB pw
-    bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
-        callback(err, isMatch);
+userSchema.methods.updatePassword = (newPassword: String, callback) => {
+    // console.log("This ", this);
+    hashPassword(newPassword, (err, hash) => {
+        if(err)
+            callback(err);
+        else {
+            // Keep working in here...
+            console.log("This ", this, "\nModel ", this.model);
+            this.default.model.password = hash;
+            // this.save();
+            callback(undefined);
+        }
     });
 };
+
+const hashPassword = (password: String, callback)  => {
+    bcrypt.genSalt(10, (err, salt) => {
+        if(err)
+            callback(err, undefined);
+        else {
+            bcrypt.hash(password, salt, (err, hash) => {
+                if(err)
+                    callback(err, undefined);
+                else
+                    callback(undefined, hash);
+            });
+        }
+    });
+};
+
 
 const User = mongoose.model<UserType>("User", userSchema);
 export default User;

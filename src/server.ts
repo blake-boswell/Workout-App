@@ -101,6 +101,10 @@ app.get("/login", function(req, res) {
     res.json({ message: "Welcome to the Login Page!", flashMessage: res.locals.sessionFlash });
 });
 app.post("/api/logout", UserController.postLogout);
+app.get("/forgot", UserController.getForgotPassword);
+app.post("/api/forgot", UserController.postForgotPassword);
+app.get("/update/password/:token", UserController.generatePasswordUpdatePage);
+app.post("/update/password/:token", UserController.postChangePasswordAction);
 
 // start express server
 app.listen(port, function() {
