@@ -104,7 +104,7 @@ app.post("/api/logout", UserController.postLogout);
 app.get("/forgot", UserController.getForgotPassword);
 app.post("/api/forgot", UserController.postForgotPassword);
 app.get("/update/password/:token", UserController.generatePasswordUpdatePage);
-app.post("/update/password/:token", UserController.postChangePasswordAction);
+app.post("/update/password/:token", UserController.postChangePassword);
 
 // start express server
 app.listen(port, function() {

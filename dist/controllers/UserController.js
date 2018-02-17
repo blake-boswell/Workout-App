@@ -53,23 +53,18 @@ exports.postSignup = function (req, res, next) {
             }
             // email && username are unique
             // Create a verification token to email
-            var verificationToken;
-            crypto.randomBytes(20, function (err, buf) {
+            generateRandomString(function (err, token) {
                 if (err) {
-                    req.session.sessionFlash = {
-                        type: "Error",
-                        message: "Error generating random token! " + err
-                    };
-                    res.status(500).redirect("/signup");
+                    var errorMsg = new Error("Error generating random token! " + err);
+                    return errorHandler(req, res, 500, errorMsg, "signup");
                 }
-                else if (buf) {
-                    verificationToken = buf.toString("hex");
+                if (token) {
                     var newUser_1 = new User_1.default({
                         username: req.body.username,
                         displayName: req.body.displayName,
                         password: req.body.password,
                         email: req.body.email,
-                        verificationToken: verificationToken
+                        verificationToken: token
                     });
                     newUser_1.save(function (err) {
                         if (err) {
@@ -79,15 +74,12 @@ exports.postSignup = function (req, res, next) {
                         // console.log(user);
                         // TODO: log user in and send them to the home page
                         // res.redirect("../login");
-                        var link = "http://" + req.get("host") + "/verify/" + verificationToken;
+                        var link = "http://" + req.get("host") + "/verify/" + token;
                         // Send verification email
                         exports.sendVerificationEmail(user.email, link, function (err, data) {
                             if (err) {
-                                req.session.sessionFlash = {
-                                    type: "Error",
-                                    message: "Error sending verification email! " + err
-                                };
-                                res.status(500).redirect("/signup");
+                                var errorMsg = new Error("Error sending verification email! " + err);
+                                return errorHandler(req, res, 500, errorMsg, "signup");
                             }
                             req.session.sessionFlash = {
                                 type: "Success",
@@ -125,9 +117,15 @@ exports.signupValidation = [
 /**
  * POST /login
  * Login action
+<<<<<<< HEAD
  *
  * email
  * password
+=======
+ * @param req Request object
+ * @param res Response object
+ * @param next Next object
+>>>>>>> Cleaned up code
  */
 exports.postLogin = function (req, res, next) {
     User_1.default.findOne({ email: req.body.email }, function (err, user) {
@@ -135,19 +133,13 @@ exports.postLogin = function (req, res, next) {
             return next(err);
         }
         if (!user) {
-            req.session.sessionFlash = {
-                type: "Error",
-                message: "A user with that email does not exist."
-            };
-            return res.status(404).redirect("/login");
+            var errorMsg = new Error("A user with that email does not exist.");
+            return errorHandler(req, res, 404, errorMsg, "login");
         }
         if (!user.isActive) {
             // Deny access
-            req.session.sessionFlash = {
-                type: "Error",
-                message: "You must activate your account with the link sent to your email first."
-            };
-            return res.status(500).redirect("/login");
+            var errorMsg = new Error("You must activate your account with the link sent to your email first.");
+            return errorHandler(req, res, 500, errorMsg, "login");
         }
         // User has activated account
         passport.authenticate("local", function (err, user, info) {
@@ -160,11 +152,7 @@ exports.postLogin = function (req, res, next) {
                 return next(err);
             }
             if (!user) {
-                req.session.sessionFlash = {
-                    type: "Error",
-                    message: info
-                };
-                return res.status(401).redirect("/login");
+                return errorHandler(req, res, 401, info, "login");
             }
             // establish a session
             req.login(user, function (err) {
@@ -213,6 +201,8 @@ exports.postLogin = function (req, res, next) {
 /**
  * POST /logout
  * Logout action
+ * @param req Request object
+ * @param res Response object
  */
 exports.postLogout = function (req, res) {
     // Log user out of session
@@ -230,6 +220,8 @@ exports.getForgotPassword = function (req, res) {
 /**
  * POST /forgot
  * Forgot password action
+ * @param req Request object
+ * @param res Response object
  */
 exports.postForgotPassword = function (req, res) {
     // Generate JWT
@@ -266,7 +258,7 @@ exports.postForgotPassword = function (req, res) {
  * @param req Request Object
  * @param res Response Object
  */
-exports.postChangePasswordAction = function (req, res) {
+exports.postChangePassword = function (req, res) {
     // Grab token
     var token = req.params.token;
     // Find user by token
@@ -290,8 +282,6 @@ exports.postChangePasswordAction = function (req, res) {
             return res.send({ message: "404 Page Not Found." });
         }
     });
-};
-exports.getChangePassword = function (req, res) {
 };
 exports.generatePasswordUpdatePage = function (req, res) {
     // Generate the Password Update Form
@@ -370,11 +360,7 @@ exports.verify = function (req, res) {
             console.log(user);
             user.save(function (err) {
                 if (err) {
-                    req.session.sessionFlash = {
-                        type: "Error",
-                        message: err
-                    };
-                    return res.status(401).redirect("/login");
+                    return errorHandler(req, res, 401, err, "login");
                 }
                 console.log(user.username + " has been activated.");
                 var html = "<h1>SUCCESS!</h1><br /><h3>" + user.username + ", you are now an active user!</h3>";
@@ -388,6 +374,14 @@ exports.verify = function (req, res) {
         }
     });
 };
+/**
+ * Creates an error flash message and optionally redirects the user
+ * @param req Request object
+ * @param res Response object
+ * @param statusCode HTTP status code
+ * @param err Error object to be used as the message
+ * @param redirectPage Page to redirect to (optional)
+ */
 var errorHandler = function (req, res, statusCode, err, redirectPage) {
     req.session.sessionFlash = {
         type: "Error",
@@ -398,11 +392,18 @@ var errorHandler = function (req, res, statusCode, err, redirectPage) {
     }
     console.log("Error in errorHandler\nError: ", err);
 };
+/**
+ * Generates a random string to be appended as a token to routes
+ * EX: 5c355a1730cbf8487757a7f6451d020659f8f4c1
+ * @param callback Callback function containing the err and token
+ */
 var generateRandomString = function (callback) {
     crypto.randomBytes(20, function (err, buf) {
         if (err)
             return callback(err);
-        var token = buf.toString("hex");
-        return callback(undefined, token);
+        if (buf) {
+            var token = buf.toString("hex");
+            return callback(undefined, token);
+        }
     });
 };

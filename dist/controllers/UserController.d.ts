@@ -19,14 +19,22 @@ export declare let signupValidation: ValidationChain[];
 /**
  * POST /login
  * Login action
+<<<<<<< HEAD
  *
  * email
  * password
+=======
+ * @param req Request object
+ * @param res Response object
+ * @param next Next object
+>>>>>>> Cleaned up code
  */
 export declare let postLogin: (req: Request, res: Response, next: NextFunction) => void;
 /**
  * POST /logout
  * Logout action
+ * @param req Request object
+ * @param res Response object
  */
 export declare let postLogout: (req: Request, res: Response) => void;
 /**
@@ -38,6 +46,8 @@ export declare let getForgotPassword: (req: Request, res: Response) => void;
 /**
  * POST /forgot
  * Forgot password action
+ * @param req Request object
+ * @param res Response object
  */
 export declare let postForgotPassword: (req: Request, res: Response) => void;
 /**
@@ -45,8 +55,7 @@ export declare let postForgotPassword: (req: Request, res: Response) => void;
  * @param req Request Object
  * @param res Response Object
  */
-export declare let postChangePasswordAction: (req: Request, res: Response) => void;
-export declare let getChangePassword: (req: Request, res: Response) => void;
+export declare let postChangePassword: (req: Request, res: Response) => void;
 export declare let generatePasswordUpdatePage: (req: Request, res: Response) => void;
 /**
  * Send email

@@ -60,22 +60,18 @@ export let postSignup = (req: Request, res: Response, next: NextFunction) => {
             }
             // email && username are unique
              // Create a verification token to email
-             let verificationToken: String;
-             crypto.randomBytes(20, (err, buf) => {
-                 if(err) {
-                     req.session.sessionFlash = {
-                         type: "Error",
-                         message: "Error generating random token! " + err
-                     };
-                     res.status(500).redirect("/signup");
-                 } else if(buf) {
-                    verificationToken = buf.toString("hex");
+             generateRandomString((err, token) => {
+                if(err) {
+                    const errorMsg = new Error("Error generating random token! " + err);
+                    return errorHandler(req, res, 500, errorMsg, "signup");
+                }
+                if(token) {
                     const newUser = new User({
                         username: req.body.username,
                         displayName: req.body.displayName,
                         password: req.body.password,
                         email: req.body.email,
-                        verificationToken: verificationToken
+                        verificationToken: token
                     });
                     newUser.save(function(err) {
                         if(err) {
@@ -85,15 +81,12 @@ export let postSignup = (req: Request, res: Response, next: NextFunction) => {
                         // console.log(user);
                         // TODO: log user in and send them to the home page
                         // res.redirect("../login");
-                        const link = "http://" + req.get("host") + "/verify/" + verificationToken;
+                        const link = "http://" + req.get("host") + "/verify/" + token;
                         // Send verification email
                         sendVerificationEmail(user.email, link, (err: any, data: any) => {
                             if(err) {
-                                req.session.sessionFlash = {
-                                    type: "Error",
-                                    message: "Error sending verification email! " + err
-                                };
-                                res.status(500).redirect("/signup");
+                                const errorMsg = new Error("Error sending verification email! " + err);
+                                return errorHandler(req, res, 500, errorMsg, "signup");
                             }
                             req.session.sessionFlash = {
                                 type: "Success",
@@ -102,8 +95,8 @@ export let postSignup = (req: Request, res: Response, next: NextFunction) => {
                             res.status(200).redirect("/login");
                         });
                     });
-                 }
-            });
+                }
+             });
         });
     });
 };
@@ -130,9 +123,15 @@ export let signupValidation: ValidationChain [] = [
 /**
  * POST /login
  * Login action
+<<<<<<< HEAD
  *
  * email
  * password
+=======
+ * @param req Request object
+ * @param res Response object
+ * @param next Next object
+>>>>>>> Cleaned up code
  */
 export let postLogin = (req: Request, res: Response, next: NextFunction) => {
     User.findOne({email: req.body.email}, (err, user) => {
@@ -141,20 +140,14 @@ export let postLogin = (req: Request, res: Response, next: NextFunction) => {
         }
 
         if(!user) {
-            req.session.sessionFlash = {
-                type: "Error",
-                message: "A user with that email does not exist."
-            };
-            return res.status(404).redirect("/login");
+            const errorMsg = new Error("A user with that email does not exist.");
+            return errorHandler(req, res, 404, errorMsg, "login");
         }
 
         if(!user.isActive) {
             // Deny access
-            req.session.sessionFlash = {
-                type: "Error",
-                message: "You must activate your account with the link sent to your email first."
-            };
-            return res.status(500).redirect("/login");
+            const errorMsg = new Error("You must activate your account with the link sent to your email first.");
+            return errorHandler(req, res, 500, errorMsg, "login");
         }
 
         // User has activated account
@@ -168,11 +161,7 @@ export let postLogin = (req: Request, res: Response, next: NextFunction) => {
                 return next(err);
             }
             if(!user) {
-                req.session.sessionFlash = {
-                    type: "Error",
-                    message: info
-                };
-                return res.status(401).redirect("/login");
+                return errorHandler(req, res, 401, info, "login");
             }
             // establish a session
             req.login(user, (err) => {
@@ -220,6 +209,8 @@ export let postLogin = (req: Request, res: Response, next: NextFunction) => {
 /**
  * POST /logout
  * Logout action
+ * @param req Request object
+ * @param res Response object
  */
 export let postLogout = (req: Request, res: Response) => {
     // Log user out of session
@@ -239,6 +230,8 @@ export let getForgotPassword = (req: Request, res: Response) => {
 /**
  * POST /forgot
  * Forgot password action
+ * @param req Request object
+ * @param res Response object
  */
 export let postForgotPassword = (req: Request, res: Response) => {
     // Generate JWT
@@ -275,7 +268,7 @@ export let postForgotPassword = (req: Request, res: Response) => {
  * @param req Request Object
  * @param res Response Object
  */
-export let postChangePasswordAction = (req: Request, res: Response) => {
+export let postChangePassword = (req: Request, res: Response) => {
     // Grab token
     const token = req.params.token;
     // Find user by token
@@ -298,10 +291,6 @@ export let postChangePasswordAction = (req: Request, res: Response) => {
             return res.send({ message: "404 Page Not Found." });
         }
     });
-};
-
-export let getChangePassword = (req: Request, res: Response) => {
-
 };
 
 export let generatePasswordUpdatePage = (req: Request, res: Response) => {
@@ -388,11 +377,7 @@ export let verify = (req: Request, res: Response) => {
             console.log(user);
             user.save((err) => {
                 if(err) {
-                    req.session.sessionFlash = {
-                        type: "Error",
-                        message: err
-                    };
-                    return res.status(401).redirect("/login");
+                    return errorHandler(req, res, 401, err, "login");
                 }
                 console.log(user.username + " has been activated.");
                 const html = "<h1>SUCCESS!</h1><br /><h3>" + user.username + ", you are now an active user!</h3>";
@@ -406,6 +391,14 @@ export let verify = (req: Request, res: Response) => {
     });
 };
 
+/**
+ * Creates an error flash message and optionally redirects the user
+ * @param req Request object
+ * @param res Response object
+ * @param statusCode HTTP status code
+ * @param err Error object to be used as the message
+ * @param redirectPage Page to redirect to (optional)
+ */
 const errorHandler = (req: Request, res: Response, statusCode: number, err: Error, redirectPage?: String) => {
     req.session.sessionFlash = {
         type: "Error",
@@ -417,11 +410,18 @@ const errorHandler = (req: Request, res: Response, statusCode: number, err: Erro
     console.log("Error in errorHandler\nError: ", err);
 };
 
+/**
+ * Generates a random string to be appended as a token to routes
+ * EX: 5c355a1730cbf8487757a7f6451d020659f8f4c1
+ * @param callback Callback function containing the err and token
+ */
 const generateRandomString = (callback) => {
     crypto.randomBytes(20, (err, buf) => {
         if(err)
             return callback(err);
-        const token = buf.toString("hex");
-        return callback(undefined, token);
+        if(buf) {
+            const token = buf.toString("hex");
+            return callback(undefined, token);
+        }
     });
 };
