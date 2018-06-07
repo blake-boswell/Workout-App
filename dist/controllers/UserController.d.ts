@@ -4,6 +4,11 @@ import { ValidationChain } from "express-validator/check";
 /**
  * POST /signup
  * Sign-up action
+ *
+ * email
+ * username
+ * displayName
+ * password
  */
 export declare let postSignup: (req: Request, res: Response, next: NextFunction) => void;
 /**
@@ -14,6 +19,9 @@ export declare let signupValidation: ValidationChain[];
 /**
  * POST /login
  * Login action
+ *
+ * email
+ * password
  */
 export declare let postLogin: (req: Request, res: Response, next: NextFunction) => void;
 /**

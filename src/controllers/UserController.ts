@@ -13,6 +13,11 @@ import * as crypto from "crypto";
 /**
  * POST /signup
  * Sign-up action
+ *
+ * email
+ * username
+ * displayName
+ * password
  */
 export let postSignup = (req: Request, res: Response, next: NextFunction) => {
 
@@ -126,6 +131,9 @@ export let signupValidation: ValidationChain [] = [
 /**
  * POST /login
  * Login action
+ *
+ * email
+ * password
  */
 export let postLogin = (req: Request, res: Response, next: NextFunction) => {
     User.findOne({email: req.body.email}, (err, user) => {

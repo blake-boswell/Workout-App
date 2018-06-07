@@ -9,6 +9,11 @@ var crypto = require("crypto");
 /**
  * POST /signup
  * Sign-up action
+ *
+ * email
+ * username
+ * displayName
+ * password
  */
 exports.postSignup = function (req, res, next) {
     // form validation
@@ -122,6 +127,9 @@ exports.signupValidation = [
 /**
  * POST /login
  * Login action
+ *
+ * email
+ * password
  */
 exports.postLogin = function (req, res, next) {
     User_1.default.findOne({ email: req.body.email }, function (err, user) {
