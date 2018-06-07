@@ -54,6 +54,7 @@
     "express-flash": "0.0.2",
     "express-session": "^1.15.6",
     "express-validator": "^4.3.0",
+    "hoek": "^5.0.3",
     "jsonwebtoken": "^8.2.1",
     "mailgun-js": "^0.14.2",
     "mongodb": "^3.0.8",
