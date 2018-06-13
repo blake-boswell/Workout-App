@@ -123,15 +123,12 @@ export let signupValidation: ValidationChain [] = [
 /**
  * POST /login
  * Login action
-<<<<<<< HEAD
  *
  * email
  * password
-=======
  * @param req Request object
  * @param res Response object
  * @param next Next object
->>>>>>> Cleaned up code
  */
 export let postLogin = (req: Request, res: Response, next: NextFunction) => {
     User.findOne({email: req.body.email}, (err, user) => {
@@ -229,6 +226,8 @@ export let getForgotPassword = (req: Request, res: Response) => {
 
 /**
  * POST /forgot
+ * 
+ * email
  * Forgot password action
  * @param req Request object
  * @param res Response object
@@ -296,6 +295,7 @@ export let postChangePassword = (req: Request, res: Response) => {
 export let generatePasswordUpdatePage = (req: Request, res: Response) => {
     // Generate the Password Update Form
     // res.sendFile("updatePassword");
+    res.send({message: "Update PW Page"});
 };
 
 /**
@@ -369,7 +369,7 @@ export let verify = (req: Request, res: Response) => {
         }
         if(!user) {
             const err = new Error("User not found.");
-            return errorHandler(req, res, 404, err, )
+            return errorHandler(req, res, 404, err, );
         }
         if(!user.isActive) {
             user.isActive = true;

@@ -62,5 +62,5 @@ typings/
 
 #personal stuff
 plan.txt
-node_modules
-dist
+dist/
+.vscode/
