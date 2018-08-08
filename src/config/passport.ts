@@ -1,15 +1,15 @@
-import * as passport from "passport";
-import * as passportLocal from "passport-local";
-import * as passportJWT from "passport-jwt";
-import { default as User, UserType } from "../models/User";
-import { Request, Response, NextFunction } from "express";
+import * as passport from 'passport';
+import * as passportLocal from 'passport-local';
+import * as passportJWT from 'passport-jwt';
+import { default as User, UserType } from '../models/User';
+import { Request, Response, NextFunction } from 'express';
 
 const LocalStrategy = passportLocal.Strategy;
-const JWTStrategy = passportJWT.Strategy;
-const options = {
-    secretOrKey: process.env.TOKEN_SECRET,
-    jwtFromRequest: passportJWT.ExtractJwt.fromAuthHeaderAsBearerToken(),
-};
+// const JWTStrategy = passportJWT.Strategy;
+// const options: passportJWT.StrategyOptions = {
+//     secretOrKey: process.env.TOKEN_SECRET,
+//     jwtFromRequest: passportJWT.ExtractJwt.fromAuthHeaderAsBearerToken(),
+// };
 
 // Session configuration
 // ID is stored to req.user and is used to find the user
@@ -25,21 +25,21 @@ passport.deserializeUser(function(id, done) {
 
 // // Local Strategy configuration
 // // Sends an error (undefined if there is none), a user (false if there is none) through the done callback
-passport.use(new LocalStrategy({ usernameField: "email" },
+passport.use(new LocalStrategy({ usernameField: 'email' },
     function(email: string, password: string, done: any) {
         User.findOne({ email: email }, function(err: Error, user: UserType) {
             if(err) {
                 return done(err);
             }
             if(!user) {
-            return done(undefined, false, { message: "Incorrect email." });
+            return done(undefined, false, { message: 'Incorrect email.' });
             }
             user.comparePassword(password, function(err: any, isMatch: boolean) {
                 if(err) {
                     return done(err);
                 }
                 if(!isMatch) {
-                    return done(undefined, false, { message: "Incorrect password." });
+                    return done(undefined, false, { message: 'Incorrect password.' });
                 }
                 return done(undefined, user);
             });
@@ -47,14 +47,24 @@ passport.use(new LocalStrategy({ usernameField: "email" },
 }));
 
 // JWT Strategy configuration
-passport.use(new JWTStrategy(options, function(jwt_payload, done) {
-    User.findOne({ _id: jwt_payload._id }, function(err: Error, user: any) {
-       if(err) {
-           return done(err);
-       }
-       if(!user) {
-           return done(undefined, false, { message: "Could not find user." });
-       }
-       return done(undefined, user);
-    });
-}));
+// passport.use(new JWTStrategy(options, function(jwt_payload, done) {
+//     User.findOne({ _id: jwt_payload._id }, function(err: Error, user: any) {
+//        if(err) {
+//            return done(err);
+//        }
+//        if(!user) {
+//            return done(undefined, false, { message: 'Could not find user.' });
+//        }
+//        return done(undefined, user);
+//     });
+// }));
+
+/**
+ * Login Required middleware.
+ */
+export let isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+    if (req.isAuthenticated()) {
+      return next();
+    }
+    res.redirect('/login');
+};

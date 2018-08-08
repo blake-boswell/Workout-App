@@ -1,5 +1,5 @@
-import * as mongoose from "mongoose";
-import * as bcrypt from "bcrypt";
+import * as mongoose from 'mongoose';
+import * as bcrypt from 'bcrypt';
 
 export interface IUser extends mongoose.Document {
     username: string;
@@ -63,39 +63,39 @@ const userSchema = new mongoose.Schema({
     },
     _followers: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+        ref: 'User'
     }],
     _following: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+        ref: 'User'
     }],
     _userPosts: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Post"
+        ref: 'Post'
     }],
     _comments: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Comment"
+        ref: 'Comment'
     }],
     _savedPosts: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Post"
+        ref: 'Post'
     }],
     _snaggedWorkouts: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Workout"
+        ref: 'Workout'
     }],
     _snaggedExercises: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Exercise"
+        ref: 'Exercise'
     }],
     _exercisesCreated: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Exercise"
+        ref: 'Exercise'
     }],
     _workouts: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Workout"
+        ref: 'Workout'
     }],
     isDeleted: {
         type: Boolean,
@@ -114,10 +114,10 @@ const userSchema = new mongoose.Schema({
 // Password hashing middleware
 // inspired by https://www.mongodb.com/blog/post/password-authentication-with-mongoose-part-1
 // MUST USE .save TO HASH THE PW
-userSchema.pre("save", function(next) {
+userSchema.pre('save', function(next) {
     const user = this;
     // Hash pw if it is new/modified
-    if(!user.isModified("password"))
+    if(!user.isModified('password'))
         return next();
 
     // Gen salt and hash pw
@@ -144,13 +144,13 @@ userSchema.methods.comparePassword = function(candidatePassword: String, callbac
 };
 
 userSchema.methods.updatePassword = (newPassword: String, callback) => {
-    // console.log("This ", this);
+    // console.log('This ', this);
     hashPassword(newPassword, (err, hash) => {
         if(err)
             callback(err);
         else {
             // Keep working in here...
-            console.log("This ", this, "\nModel ", this.model);
+            console.log('This ', this, '\nModel ', this.model);
             this.default.model.password = hash;
             // this.save();
             callback(undefined);
@@ -174,5 +174,5 @@ const hashPassword = (password: String, callback)  => {
 };
 
 
-const User = mongoose.model<UserType>("User", userSchema);
+const User = mongoose.model<UserType>('User', userSchema);
 export default User;

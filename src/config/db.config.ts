@@ -1,5 +1,5 @@
 const config = {
-    url: "mongodb://localhost/workoutApp",
-    secret: "shhhtheycannothearushere"
+    url: process.env.DB_URL,
+    secret: process.env.DB_SECRET
 };
 export default config;
